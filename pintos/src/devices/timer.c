@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/sleep.h"
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -29,6 +30,7 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
+static void update_sleep_list (void);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -85,15 +87,26 @@ timer_elapsed (int64_t then)
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. */
+   be turned on.
 void
-timer_sleep (int64_t ticks) 
+timer_sleep1 (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
   while (timer_elapsed (start) < ticks) 
     thread_yield ();
+}*/
+
+/*Calculates the time to wake up the thread and then adds it to the sleep list. Calls thread_block to block the thread and schedule another thread*/
+void timer_sleep(int64_t ticks)
+{
+  enum intr_level old_level = intr_disable ();
+  struct thread *t = thread_current (); 
+  t -> wakeup = timer_ticks() + ticks;
+  list_push_back (&sleep_list, &t->sleepelem);
+  thread_block();
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -165,14 +178,33 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
+static void update_sleep_list(void)
+{
+  struct list_elem *e = list_begin (&sleep_list);
+  while(e != list_end(&sleep_list))
+  {
+    struct thread *t = list_entry(e,struct thread, sleepelem);
+    if(t->wakeup != -1 && t->wakeup <=timer_ticks())
+    {
+      e = list_remove (e);
+      t->wakeup = -1;
+      thread_unblock(t);
+    }
+    else
+      e=list_next (e);
+  }
+}
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  update_sleep_list ();
 }
+
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
