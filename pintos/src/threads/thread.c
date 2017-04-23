@@ -12,6 +12,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "threads/sleep.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -502,8 +503,13 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_back (&ready_list), struct thread, elem);
+  else{
+    struct list_elem *max_list_elem = list_max (&ready_list,thread_priority_comparator,NULL);
+    struct thread *t = list_entry (max_list_elem,struct thread, elem);
+    list_remove(max_list_elem);
+    return t;
+    //return list_entry (list_pop_back (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -610,7 +616,7 @@ bool lock_priority_comparator(const struct list_elem *curr_elem, const struct li
 
 int thread_effective_priority(struct thread *curr_thread)
 {
-  if (list_begin(&curr_thread->lock_priority_list) != list_rbegin(&curr_thread->lock_priority_list)){
+  if (!list_empty(&curr_thread->lock_priority_list)){
     struct list_elem *max_elem = list_max(&curr_thread->lock_priority_list, lock_priority_comparator, NULL);
     struct lock_priority_elem  *curr_lock_priority= list_entry(max_elem, struct lock_priority_elem, elem);
     if (curr_lock_priority->priority > curr_thread->base_priority)
@@ -618,6 +624,39 @@ int thread_effective_priority(struct thread *curr_thread)
   }
   return curr_thread->base_priority;
 }
+
+void donate_priority(struct lock *lock_ptr,int donated_priority,int depth)
+{
+  if (depth>8)
+  {
+    printf("Nested priority donation depth exceeded!");
+    return;
+  }
+  if(!check_and_update_lock_priority(lock_ptr,donated_priority)){
+    struct lock_priority_elem *curr_elem = (struct lock_priority_elem *) malloc(sizeof(struct lock_priority_elem));
+    curr_elem->lock_ptr = lock_ptr;
+    curr_elem->priority=donated_priority;
+    list_push_front(&lock_ptr->holder->lock_priority_list,&curr_elem->elem);
+  }
+  if(lock_ptr->holder->waiting_on_lock != NULL)
+    donate_priority(lock_ptr->holder->waiting_on_lock,donated_priority,depth+1);
+}
+
+bool check_and_update_lock_priority(struct lock *lock_ptr, int donated_priority){
+  struct list *lock_priority_list = &(lock_ptr->holder->lock_priority_list);
+  struct list_elem *e;
+  for (e=list_begin (lock_priority_list); e!=list_end(lock_priority_list); e=list_next (e))
+  {
+    struct lock_priority_elem *curr_elem = list_entry (e,struct lock_priority_elem,elem);
+    if (curr_elem->lock_ptr == lock_ptr)
+    {
+      curr_elem->priority=donated_priority;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 
 
 /* Offset of `stack' member within `struct thread'.

@@ -159,4 +159,6 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 bool thread_priority_comparator(const struct list_elem *to_insert_elem,const struct list_elem *curr, void *aux);
 int thread_effective_priority(struct thread *curr_thread);
+void donate_priority(struct lock *lock_ptr, int donated_priority, int depth);
+bool check_and_update_lock_priority(struct lock *lock_ptr, int donated_priority);
 #endif /* threads/thread.h */

@@ -41,6 +41,7 @@ void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 bool lock_priority_comparator(const struct list_elem *curr_elem, const struct list_elem *check_elem, void *aux);
+bool semaphore_priority_comparator(const struct list_elem *compared, const struct list_elem *curr, void *aux);
 
 /* Optimization barrier.
 
