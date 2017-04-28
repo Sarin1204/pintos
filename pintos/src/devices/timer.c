@@ -18,6 +18,8 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+#define RECALC_FREQ 4
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
@@ -203,6 +205,17 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   update_sleep_list ();
+
+  if(thread_mlfqs)
+  {
+    if(timer_ticks() % TIMER_FREQ==0){
+      calc_load_avg();
+      recalc_thread_mlfqs_recent_cpu();
+    }
+    if(ticks%RECALC_FREQ == 0)
+      recalc_thread_mlfqs_priority();
+  }
+
 }
 
 

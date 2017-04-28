@@ -91,6 +91,8 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int base_priority;                       /* Priority. */
     int64_t wakeup;
+    int nice;
+    int recent_cpu;
 
     /*List of locks and donated priorities associated with each lock*/
     struct list lock_priority_list;
@@ -161,4 +163,14 @@ bool thread_priority_comparator(const struct list_elem *to_insert_elem,const str
 int thread_effective_priority(struct thread *curr_thread);
 void donate_priority(struct lock *lock_ptr, int donated_priority, int depth);
 bool check_and_update_lock_priority(struct lock *lock_ptr, int donated_priority);
+
+int update_recent_cpu(struct thread *t);
+int thread_calc_mlfqs_priority(struct thread *t);
+int64_t convert_float_int(int value);
+void recalc_thread_mlfqs_priority(void);
+void recalc_thread_mlfqs_recent_cpu(void);
+void calc_load_avg(void);
+bool thread_mlfqs_priority_comparator(const struct list_elem *to_insert_elem, const struct list_elem *curr_elem, void *aux);
+
+
 #endif /* threads/thread.h */
